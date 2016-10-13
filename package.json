@@ -1,0 +1,12 @@
+{
+  "name": "nqm-databot-geo-googleapi",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "csvtojson": "^1.0.2"
+    "geocoder": "~0.2.2"
+  }
+}
