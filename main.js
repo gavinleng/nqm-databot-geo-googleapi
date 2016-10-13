@@ -35,14 +35,19 @@ function databot(input, output, context) {
 	
 	const len = addressArray.length;
 	
+	////////////////////////////
+	_countWrite =0;
+	_countCon =0;
+	_countGApi =0;
+	
 	const write = function(data) {
 		var self = this;
-		
+		_countWrite ++;
 		self.emit("data", data.toString() + "\n");  // emit the new data
-		self.pause();                               // pause stream
+		/*self.pause();                               // pause stream
 		setTimeout(function() {                     // wait
 			self.resume();                          // resume after timeout
-		}, timeInterval);
+		}, timeInterval);*/
 	};
 	
 	const end = function() {
@@ -51,19 +56,25 @@ function databot(input, output, context) {
 		this.emit("end");
 	};
 	
+	const through = es.through(write,end);
+	
 	output.debug("fetching data for %s", dataInId);
 	
 	request
 		.pipe(es.split())                           // split the file into lines
-		.pipe(es.through(write,end))                // pass each line through the 'write' function
+		.pipe(through)                // pass each line through the 'write' function
 		.pipe(converter)                            // then pipe to converter
 		.on("record_parsed", function(jsonObj) {
 			// do work here.
-			var singleEntry = jsonObj;
+			through.pause();
 			
+			var singleEntry = jsonObj;
+			_countCon++;
 			var addressString = "";
 			for (var i = 0; i < len; i++) {
-				addressString = addressString + singleEntry[addressArray[i]] + ", ";
+				if (singleEntry[addressArray[i]]) {
+					addressString = addressString + singleEntry[addressArray[i]] + ", ";
+				}
 			}
 			
 			addressString = addressString + "United Kingdom";
@@ -72,10 +83,27 @@ function databot(input, output, context) {
 			
 			var singleData = {"type": "Feature","properties": {}, "geometry": {"type": "Point", "coordinates": []}};
 			
+			//////////////////////////////////////////
+			if (Math.abs(_countWrite - _countCon) > 2) {
+				output.debug("outside of google api: countGApi " + _countGApi + ', countCon ' + _countCon);
+				console.log("outside of google api: countGApi " + _countWrite + ', countCon ' + _countCon);
+				process.exit(1);
+			}
+			
+			var  apiCount = 0;
 			geocoder.geocode(stringAddress, function (err, data) {
-				console.log("streaming geo-googleapi data ...");
-				
-				if (data.status == "OK") {
+				console.log("streaming geo-googleapi data ..." + ++apiCount);
+				_countGApi++;
+				if (err) {
+					output.debug("the google api query error: %s ", err);
+					console.log("the google api query error: %s ", err);
+					
+					output.debug("countWrite: " + _countWrite + ", countGApi: " + _countGApi + ', countCon: ' + _countCon);
+					console.log("countWrite: " + _countWrite + ", countGApi: " + _countGApi + ', countCon: ' + _countCon);
+					
+					process.exit(1);
+				}
+				else if (data.status == "OK") {
 					// obtaining the most probable location
 					var loc = data.results[0].geometry.location;
 					
@@ -94,8 +122,26 @@ function databot(input, output, context) {
 				
 				singleData.properties = singleEntry;
 				
+				//////////////////////////////////////////
+				if (Math.abs(_countGApi - _countCon) > 2) {
+					output.debug("inside of google api: countGApi " + _countGApi + ', countCon ' + _countCon);
+					console.log("inside of google api: countGApi" + _countGApi + ', countCon ' + _countCon);
+					process.exit(1);
+				}
+				
+				if (_countWrite % 500 == 0) {
+					output.debug("countWrite: " + _countWrite + ", countGApi: " + _countGApi + ', countCon: ' + _countCon);
+					console.log("countWrite: " + _countWrite + ", countGApi: " + _countGApi + ', countCon: ' + _countCon);
+				}
+				
 				writeStream.write(JSON.stringify(singleData) + "\n");
+				
+				setTimeout( function () {                      // wait
+					through.resume();                         // resume after timeout
+				}, timeInterval);
+				
 			}, apiKey);
+
 		});
 	
 }

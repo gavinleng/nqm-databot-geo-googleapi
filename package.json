@@ -6,7 +6,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "csvtojson": "^1.0.2"
+    "csvtojson": "^1.0.2",
     "geocoder": "~0.2.2"
   }
 }
