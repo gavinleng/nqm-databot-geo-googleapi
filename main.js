@@ -56,7 +56,8 @@ function databot(input, output, context) {
 		this.emit("end");
 	};
 	
-	const through = es.through(write,end);
+	//const through = es.through(write,end);
+	const through = es.through(write,end,{autoDestroy:false});
 	
 	output.debug("fetching data for %s", dataInId);
 	
@@ -84,14 +85,14 @@ function databot(input, output, context) {
 			var singleData = {"type": "Feature","properties": {}, "geometry": {"type": "Point", "coordinates": []}};
 			
 			//////////////////////////////////////////
-			if (Math.abs(_countWrite - _countCon) > 2) {
+			/*if (Math.abs(_countWrite - _countCon) > 2) {
 				output.debug("outside of google api: countGApi " + _countGApi + ', countCon ' + _countCon);
 				console.log("outside of google api: countGApi " + _countWrite + ', countCon ' + _countCon);
 				process.exit(1);
-			}
+			}*/
 			
 			var  apiCount = 0;
-			geocoder.geocode(stringAddress, function (err, data) {
+			/*geocoder.geocode(stringAddress, function (err, data) {
 				console.log("streaming geo-googleapi data ..." + ++apiCount);
 				_countGApi++;
 				if (err) {
@@ -140,8 +141,29 @@ function databot(input, output, context) {
 					through.resume();                         // resume after timeout
 				}, timeInterval);
 				
-			}, apiKey);
-
+			}, apiKey);*/
+			
+			//////////////////////////////////////////
+			/*if (Math.abs(_countGApi - _countCon) > 2) {
+				output.debug("inside of google api: countGApi " + _countGApi + ', countCon ' + _countCon);
+				console.log("inside of google api: countGApi" + _countGApi + ', countCon ' + _countCon);
+				process.exit(1);
+			}*/
+			
+			///////////////////////////////////////////////////////////////////////////////////////////
+			singleData.properties = singleEntry;
+			
+			console.log("streaming the data ..." + _countWrite);
+			setTimeout( function () {                      // wait
+				through.resume();                         // resume after timeout
+			}, timeInterval);
+			
+			if (_countWrite % 500 == 0) {
+				output.debug("countWrite: " + _countWrite + ", countGApi: " + _countGApi + ', countCon: ' + _countCon);
+				console.log("countWrite: " + _countWrite + ", countGApi: " + _countGApi + ', countCon: ' + _countCon);
+			}
+			
+			writeStream.write(JSON.stringify(singleData) + "\n");
 		});
 	
 }
