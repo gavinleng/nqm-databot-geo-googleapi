@@ -4,7 +4,7 @@
 
 
 module.exports = (function() {
-	"use strict";
-	
-	return require("./main.js");
+  "use strict";
+
+  return require("./main.js");
 }());
