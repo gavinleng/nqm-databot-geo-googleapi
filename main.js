@@ -12,15 +12,14 @@ function databot(input, output, context) {
   output.progress(0);
 
   if (!input.timeInterval || !input.dataInId || !input.outPath || !input.addressArray || !input.googleApiKey) {
-    output.error("invalid arguments - please supply timeInterval, dataInId, outPath, addressArray, googleApiKey");
-    process.exit(1);
+    output.abort("invalid arguments - please supply timeInterval, dataInId, outPath, addressArray, googleApiKey");
   }
 
   const dataInId = input.dataInId;
   const outPath = input.outPath;
   const addressArray = input.addressArray;
   const apiKey = { key: input.googleApiKey };
-  const converter = new Converter({});
+  const converter = new Converter({ constructResult: false });
   const api = context.tdxApi;
   const writeStream = fs.createWriteStream(outPath);
   const tempPath = outPath + ".tmp.json";
@@ -37,8 +36,7 @@ function databot(input, output, context) {
   };
 
   const end = function () {
-    output.progress(100);
-    output.debug("ended %d/%d", _countWrite, _countCon);
+    output.debug("reached CSV input end %d/%d", _countWrite, _countCon);
     this.emit("end");
   };
 
@@ -66,11 +64,9 @@ function databot(input, output, context) {
       _countGApi++;
 
       if (err) {
-        output.debug("the google api query error: %s ", err);
         output.debug("countWrite: " + _countWrite + ", countGApi: " + _countGApi + ", countCon: " + _countCon);
-        process.exit(1);
-      }
-      else if (data.status == "OK") {
+        output.abort("the google api query error: %s ", err);
+      } else if (data.status == "OK") {
         // obtaining the most probable location
         var loc = data.results[0].geometry.location;
 
@@ -118,6 +114,17 @@ function databot(input, output, context) {
       });
   };
 
+  const tidyUp = function() {
+    fs.unlink(tempPath, function(err) {
+      if (err) {
+        output.error("failed to remove temporary file %s", tempPath);
+      }
+
+      output.debug("finished");
+      output.progress(100);
+    });
+  };
+
   const tempFileReady = function () {
     getLineCount(function(err, lc) {
       _lineCount = lc;
@@ -128,7 +135,8 @@ function databot(input, output, context) {
         .pipe(es.split())                           // split the file into lines
         .pipe(through)                							// pass each line through the "write" function
         .pipe(converter)                            // then pipe to converter
-        .on("record_parsed", parseRow);
+        .on("record_parsed", parseRow)
+        .on("end_parsed", tidyUp);
     });
   };
 
